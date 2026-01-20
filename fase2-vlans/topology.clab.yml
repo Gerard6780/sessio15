@@ -44,10 +44,12 @@ topology:
       exec:
         # IP al backend
         - ip addr add 10.25.115.200/26 dev eth1
+        # Esperar que els relays estiguin actius
+        - sleep 15
         # Rutes cap a les VLANs via relays
-        - ip route add 10.25.115.0/26 via 10.25.115.100
-        - ip route add 10.25.115.64/26 via 10.25.115.101
-        - ip route add 10.25.115.128/26 via 10.25.115.102
+        - ip route add 10.25.115.0/26 via 10.25.115.100 || true
+        - ip route add 10.25.115.64/26 via 10.25.115.101 || true
+        - ip route add 10.25.115.128/26 via 10.25.115.102 || true
 
     # ==================
     # RELAYS DHCP
