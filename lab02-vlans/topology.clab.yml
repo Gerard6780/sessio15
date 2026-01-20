@@ -1,0 +1,121 @@
+# Lab02 - Fase 2: Múltiples VLANs amb DHCP Relay
+# ===============================================
+# IP Assignada: 10.25.115.0/24
+# - VLAN 10: 10.25.115.0/26   (10.25.115.1-63)
+# - VLAN 20: 10.25.115.64/26  (10.25.115.65-127)
+# - VLAN 30: 10.25.115.128/26 (10.25.115.129-191)
+# - Backend: 10.25.115.192/26 (10.25.115.193-254)
+#
+# Desplegament: sudo containerlab deploy -t lab02-vlans/topology.clab.yml
+
+name: kea-lab02-vlans
+
+mgmt:
+  network: clab-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  nodes:
+    # ==================
+    # BRIDGES
+    # ==================
+    br-backend:
+      kind: bridge
+
+    br-vlan10:
+      kind: bridge
+
+    br-vlan20:
+      kind: bridge
+
+    br-vlan30:
+      kind: bridge
+
+    # ==================
+    # SERVIDOR KEA DHCP
+    # ==================
+    kea:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      binds:
+        - ./configs/kea/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      startup-delay: 5
+      exec:
+        # IP al backend
+        - ip addr add 10.25.115.200/26 dev eth1
+        # Rutes cap a les VLANs via relays
+        - ip route add 10.25.115.0/26 via 10.25.115.100
+        - ip route add 10.25.115.64/26 via 10.25.115.101
+        - ip route add 10.25.115.128/26 via 10.25.115.102
+
+    # ==================
+    # RELAYS DHCP
+    # ==================
+    relay-vlan10:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.25.115.200"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        # IP al backend per comunicar amb Kea
+        - ip addr add 10.25.115.100/26 dev eth1
+        # IP a la VLAN (gateway dels clients)
+        - ip addr add 10.25.115.1/26 dev eth2
+
+    relay-vlan20:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.25.115.200"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        - ip addr add 10.25.115.101/26 dev eth1
+        - ip addr add 10.25.115.65/26 dev eth2
+
+    relay-vlan30:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.25.115.200"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        - ip addr add 10.25.115.102/26 dev eth1
+        - ip addr add 10.25.115.129/26 dev eth2
+
+    # ==================
+    # CLIENTS
+    # ==================
+    client-vlan10:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    client-vlan20:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    client-vlan30:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+  links:
+    # Xarxa Backend (Kea <-> Relays) - 10.25.115.192/26
+    - endpoints: ["kea:eth1", "br-backend:be-kea"]
+    - endpoints: ["relay-vlan10:eth1", "br-backend:be-r10"]
+    - endpoints: ["relay-vlan20:eth1", "br-backend:be-r20"]
+    - endpoints: ["relay-vlan30:eth1", "br-backend:be-r30"]
+
+    # VLAN 10 - 10.25.115.0/26
+    - endpoints: ["relay-vlan10:eth2", "br-vlan10:v10-relay"]
+    - endpoints: ["client-vlan10:eth1", "br-vlan10:v10-cli"]
+
+    # VLAN 20 - 10.25.115.64/26
+    - endpoints: ["relay-vlan20:eth2", "br-vlan20:v20-relay"]
+    - endpoints: ["client-vlan20:eth1", "br-vlan20:v20-cli"]
+
+    # VLAN 30 - 10.25.115.128/26
+    - endpoints: ["relay-vlan30:eth2", "br-vlan30:v30-relay"]
+    - endpoints: ["client-vlan30:eth1", "br-vlan30:v30-cli"]

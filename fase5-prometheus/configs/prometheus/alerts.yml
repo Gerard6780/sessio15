@@ -1,0 +1,53 @@
+# Alert rules for Kea DHCP monitoring
+groups:
+  - name: kea_dhcp_alerts
+    rules:
+      # Alert when a subnet pool is above 80% utilization
+      - alert: DHCPPoolHighUtilization
+        expr: storkserver_subnet_address_utilization * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DHCP Pool utilization above 80%"
+          description: "Subnet {{ $labels.subnet }} has {{ $value | printf \"%.1f\" }}% pool utilization"
+
+      # Alert when a subnet pool is above 95% utilization (critical)
+      - alert: DHCPPoolCriticalUtilization
+        expr: storkserver_subnet_address_utilization * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DHCP Pool utilization critical (>95%)"
+          description: "Subnet {{ $labels.subnet }} has {{ $value | printf \"%.1f\" }}% pool utilization - addresses almost exhausted!"
+
+      # Alert when Stork has unreachable machines
+      - alert: StorkMachineUnreachable
+        expr: storkserver_auth_unreachable_machine_total > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stork has unreachable machines"
+          description: "{{ $value }} Kea machine(s) are unreachable by Stork"
+
+      # Alert when Stork agent is unreachable
+      - alert: StorkAgentUnreachable
+        expr: up{job="stork"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stork server unreachable"
+          description: "Cannot scrape metrics from Stork server"
+
+      # Alert when there are unauthorized machines (potential new servers)
+      - alert: StorkUnauthorizedMachines
+        expr: storkserver_auth_unauthorized_machine_total > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unauthorized machines detected"
+          description: "{{ $value }} machine(s) pending authorization in Stork"
