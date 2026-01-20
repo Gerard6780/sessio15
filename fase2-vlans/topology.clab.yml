@@ -4,7 +4,7 @@
 # - VLAN 10: 10.25.115.0/26   (10.25.115.1-63)
 # - VLAN 20: 10.25.115.64/26  (10.25.115.65-127)
 # - VLAN 30: 10.25.115.128/26 (10.25.115.129-191)
-# - Backend: 10.25.115.192/26 (10.25.115.193-254)
+# - Backend: 10.25.115.0/24 (tota la xarxa per connectivitat)
 #
 # Desplegament: ./scripts/deploy.sh vlans
 
@@ -42,14 +42,8 @@ topology:
         - ./configs/kea/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
       startup-delay: 5
       exec:
-        # IP al backend
-        - ip addr add 10.25.115.200/26 dev eth1
-        # Esperar que els relays estiguin actius
-        - sleep 15
-        # Rutes cap a les VLANs via relays
-        - ip route add 10.25.115.0/26 via 10.25.115.100 || true
-        - ip route add 10.25.115.64/26 via 10.25.115.101 || true
-        - ip route add 10.25.115.128/26 via 10.25.115.102 || true
+        # IP al backend amb /24 per connectivitat amb tots els relays
+        - ip addr add 10.25.115.200/24 dev eth1
 
     # ==================
     # RELAYS DHCP
@@ -63,8 +57,8 @@ topology:
         LISTEN_INTERFACE: "eth2"
       startup-delay: 10
       exec:
-        # IP al backend per comunicar amb Kea
-        - ip addr add 10.25.115.100/26 dev eth1
+        # IP al backend per comunicar amb Kea (amb /24)
+        - ip addr add 10.25.115.100/24 dev eth1
         # IP a la VLAN (gateway dels clients)
         - ip addr add 10.25.115.1/26 dev eth2
 
@@ -76,7 +70,7 @@ topology:
         LISTEN_INTERFACE: "eth2"
       startup-delay: 10
       exec:
-        - ip addr add 10.25.115.101/26 dev eth1
+        - ip addr add 10.25.115.101/24 dev eth1
         - ip addr add 10.25.115.65/26 dev eth2
 
     relay-vlan30:
@@ -87,7 +81,7 @@ topology:
         LISTEN_INTERFACE: "eth2"
       startup-delay: 10
       exec:
-        - ip addr add 10.25.115.102/26 dev eth1
+        - ip addr add 10.25.115.102/24 dev eth1
         - ip addr add 10.25.115.129/26 dev eth2
 
     # ==================
@@ -107,7 +101,7 @@ topology:
       image: nicolaka/netshoot:latest
 
   links:
-    # Xarxa Backend (Kea <-> Relays) - 10.25.115.192/26
+    # Xarxa Backend (Kea <-> Relays) - 10.25.115.0/24
     - endpoints: ["kea:eth1", "br-backend:be-kea"]
     - endpoints: ["relay-vlan10:eth1", "br-backend:be-r10"]
     - endpoints: ["relay-vlan20:eth1", "br-backend:be-r20"]
